@@ -10,7 +10,8 @@ This package contains the implementations for BRW128 and BRW256 for t = 2, 3, 4 
 
 In each package, 
 
-    the file mult128.h or mult256.h contains routines for basic field multiplications and routines to calculate unreducedBRW on 1 to 2^t-1 field elements.
+    the file mult128.h or mult256.h contains routines for basic field multiplications and routines to calculate 
+    unreducedBRW on 1 to 2^t-1 field elements.
 
     the file brw.c contains the routine to evaluate the hash function and the main function.
 
