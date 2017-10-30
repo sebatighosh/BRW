@@ -1,0 +1,651 @@
+/*
+###############################################################################
+# BRW256 developers and authors:                                              #                                                                           
+# Sebati Ghosh,        		Indian Statistical Institute                  #
+# Palash Sarkar,       		Indian Statistical Institute                  #
+###############################################################################
+#                                                                             #
+###############################################################################
+#                                                                             #
+# Copyright (c) 2017, Sebati Ghosh, Palash Sarkar,                            #
+#                                                                             #
+# Permission to use this code for BRW256 is granted.                          #
+#                                                                             #
+# Redistribution and use in source and binary forms, with or without          #
+# modification, are permitted provided that the following conditions are      #
+# met:                                                                        #
+#                                                                             #
+# * Redistributions of source code must retain the above copyright notice,    #
+#   this list of conditions and the following disclaimer.                     #
+#                                                                             #
+# * Redistributions in binary form must reproduce the above copyright         #
+#   notice, this list of conditions and the following disclaimer in the       #
+#   documentation and/or other materials provided with the distribution.      #
+#                                                                             #
+# * The names of the contributors may not be used to endorse or promote       #
+# products derived from this software without specific prior written          #
+# permission.                                                                 #
+#                                                                             #
+###############################################################################
+#                                                                             #
+###############################################################################
+# THIS SOFTWARE IS PROVIDED BY THE AUTHORS ""AS IS"" AND ANY                  #
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE           #
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR          #
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE        #
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 		      #
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 	      #
+# OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR          	      #
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF      #
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING        #
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS          #
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                #
+###############################################################################
+*/
+
+
+
+#include<immintrin.h>
+#include<wmmintrin.h>
+#include<emmintrin.h>
+#include<smmintrin.h> 
+#include<x86intrin.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<stdint.h>
+#include<time.h>
+#include<math.h>
+
+#include "mult256.h"
+#include "timedefs.h"
+
+
+//#define SetBit(A,k)     ( A[(k/32)] |= (1 << (k%32)) )
+
+
+#define MAX 32000
+
+
+
+
+
+#define STAMP ({unsigned res; __asm__ __volatile__ ("rdtsc" : "=a"(res) : : "edx"); res;}) /* Time stamp */
+
+
+
+int main(int argc,char *argv[])
+{
+	
+	int i, j, k, noOfBytes, noOfBlocks, partial=0, pad=0, step, t, loopcnt, rem , lg;
+	unsigned char k1[32],f1[MAX];
+	
+	__m128i result[2], key[2], inp[MAX/2][2];
+	
+	
+	double tmpd;
+	
+	if (argc==1)
+	{
+		printf("usage:%s msg_length\n", argv[0]);
+		exit(-1);
+	}
+
+	else 
+		noOfBytes=atoi(argv[1]);
+		
+
+	if (noOfBytes==0)
+	{
+		//pad = 0;
+		noOfBlocks = 0;
+	}	
+
+	else
+	{
+		partial = noOfBytes % 32;
+		if(partial)
+		pad = 32 - partial;
+		noOfBlocks = (noOfBytes+pad)/32;
+
+	}
+
+	for(i = 0;i < noOfBytes;i++)
+	{
+		f1[i] = rand();
+			
+
+	}
+	for(i = noOfBytes;i < noOfBytes+pad;i++)
+	{
+		f1[i] = 0;
+			
+
+	}
+	//printf("%d", i);
+	
+	k=0;
+	for(j = 0;j < i/16; j=j+2)
+	{
+		inp[k][0] = ((__m128i *)f1)[j];
+		inp[k][1] = ((__m128i *)f1)[j+1];
+		k++;
+	
+	}
+	//inp[k][0] = _mm_set_epi32 (0, 0, 0, noOfBytes*8);
+	//inp[k][1] = _mm_set_epi32 (0, 0, 0, 0);
+
+	
+ 	for(i=31 ; i>=0 ; i--)
+	{
+  		k1[i]  = rand();
+  	}
+
+	
+	key[0] = _mm_set_epi8(k1[15],k1[14], k1[13], k1[12], k1[11], k1[10], k1[9], k1[8], k1[7], k1[6], k1[5], k1[4], k1[3], k1[2], k1[1], k1[0]);
+	key[1] = _mm_set_epi8(k1[31],k1[30], k1[29], k1[28], k1[27], k1[26], k1[25], k1[24], k1[23], k1[22], k1[21], k1[20], k1[19], k1[18], k1[17], k1[16]);
+
+
+	lg = log(noOfBlocks)/log(2);
+
+t=5;
+step = pow(2,t);
+loopcnt = noOfBlocks/step;
+rem = noOfBlocks % step;
+	
+	/*for(i=0;i<=k;i++){\
+	printf("\n%x",_mm_extract_epi8 (inp[i][0], 0));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 1));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 2));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 3));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 4));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 5));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 6));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 7));    		
+		printf("%x",_mm_extract_epi8 (inp[i][0], 8));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 9));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 10));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 11));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 12));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 13));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 14));
+		printf("%x",_mm_extract_epi8 (inp[i][0], 15));
+		printf("\n%x",_mm_extract_epi8 (inp[i][1], 0));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 1));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 2));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 3));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 4));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 5));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 6));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 7));    		
+		printf("%x",_mm_extract_epi8 (inp[i][1], 8));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 9));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 10));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 11));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 12));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 13));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 14));
+		printf("%x",_mm_extract_epi8 (inp[i][1], 15));}
+	printf("\n%x",_mm_extract_epi8 (key[0], 0));
+		printf("%x",_mm_extract_epi8 (key[0], 1));
+		printf("%x",_mm_extract_epi8 (key[0], 2));
+		printf("%x",_mm_extract_epi8 (key[0], 3));
+		printf("%x",_mm_extract_epi8 (key[0], 4));
+		printf("%x",_mm_extract_epi8 (key[0], 5));
+		printf("%x",_mm_extract_epi8 (key[0], 6));
+		printf("%x",_mm_extract_epi8 (key[0], 7));
+		printf("%x",_mm_extract_epi8 (key[0], 8));
+		printf("%x",_mm_extract_epi8 (key[0], 9));
+		printf("%x",_mm_extract_epi8 (key[0], 10));
+		printf("%x",_mm_extract_epi8 (key[0], 11));
+		printf("%x",_mm_extract_epi8 (key[0], 12));
+		printf("%x",_mm_extract_epi8 (key[0], 13));
+		printf("%x",_mm_extract_epi8 (key[0], 14));
+		printf("%x",_mm_extract_epi8 (key[0], 15));
+		printf("\n%x",_mm_extract_epi8 (key[1], 0));
+		printf("%x",_mm_extract_epi8 (key[1], 1));
+		printf("%x",_mm_extract_epi8 (key[1], 2));
+		printf("%x",_mm_extract_epi8 (key[1], 3));
+		printf("%x",_mm_extract_epi8 (key[1], 4));
+		printf("%x",_mm_extract_epi8 (key[1], 5));
+		printf("%x",_mm_extract_epi8 (key[1], 6));
+		printf("%x",_mm_extract_epi8 (key[1], 7));
+		printf("%x",_mm_extract_epi8 (key[1], 8));
+		printf("%x",_mm_extract_epi8 (key[1], 9));
+		printf("%x",_mm_extract_epi8 (key[1], 10));
+		printf("%x",_mm_extract_epi8 (key[1], 11));
+		printf("%x",_mm_extract_epi8 (key[1], 12));
+		printf("%x",_mm_extract_epi8 (key[1], 13));
+		printf("%x",_mm_extract_epi8 (key[1], 14));
+		printf("%x",_mm_extract_epi8 (key[1], 15));*/
+
+	if (noOfBlocks==0)
+	{
+		result[0] = result[1] = _mm_setzero_si128 ();
+		//return;
+	}
+
+	else 
+	//calcBRW(inp, key, noOfBlocks, result, lg, step, loopcnt, rem, t);
+   	//printf("%d", noOfBlocks);
+	DO(BRW256(inp, key, noOfBlocks, noOfBytes, result, lg, step, loopcnt, rem, t);ASSIGN(key,result));
+	tmpd = ((median_get())/(double)(N*noOfBytes));
+        printf("\n median cycles in entire BRW= %lf \n",tmpd);
+	
+
+	printf("\nresult:\n");
+		printf("\n%x",_mm_extract_epi8 (result[0], 0));
+		printf("%x",_mm_extract_epi8 (result[0], 1));
+		printf("%x",_mm_extract_epi8 (result[0], 2));
+		printf("%x",_mm_extract_epi8 (result[0], 3));
+		printf("%x",_mm_extract_epi8 (result[0], 4));
+		printf("%x",_mm_extract_epi8 (result[0], 5));
+		printf("%x",_mm_extract_epi8 (result[0], 6));
+		printf("%x",_mm_extract_epi8 (result[0], 7));    		
+		printf("%x",_mm_extract_epi8 (result[0], 8));
+		printf("%x",_mm_extract_epi8 (result[0], 9));
+		printf("%x",_mm_extract_epi8 (result[0], 10));
+		printf("%x",_mm_extract_epi8 (result[0], 11));
+		printf("%x",_mm_extract_epi8 (result[0], 12));
+		printf("%x",_mm_extract_epi8 (result[0], 13));
+		printf("%x",_mm_extract_epi8 (result[0], 14));
+		printf("%x",_mm_extract_epi8 (result[0], 15));
+		printf("\n%x",_mm_extract_epi8 (result[1], 0));
+		printf("%x",_mm_extract_epi8 (result[1], 1));
+		printf("%x",_mm_extract_epi8 (result[1], 2));
+		printf("%x",_mm_extract_epi8 (result[1], 3));
+		printf("%x",_mm_extract_epi8 (result[1], 4));
+		printf("%x",_mm_extract_epi8 (result[1], 5));
+		printf("%x",_mm_extract_epi8 (result[1], 6));
+		printf("%x",_mm_extract_epi8 (result[1], 7));    		
+		printf("%x",_mm_extract_epi8 (result[1], 8));
+		printf("%x",_mm_extract_epi8 (result[1], 9));
+		printf("%x",_mm_extract_epi8 (result[1], 10));
+		printf("%x",_mm_extract_epi8 (result[1], 11));
+		printf("%x",_mm_extract_epi8 (result[1], 12));
+		printf("%x",_mm_extract_epi8 (result[1], 13));
+		printf("%x",_mm_extract_epi8 (result[1], 14));
+		printf("%x",_mm_extract_epi8 (result[1], 15));
+		printf("\n");
+	
+return 0;
+
+}
+
+
+
+/*int TestBit( int A[],  int k )
+   {
+      return ( (A[k/32] & (1 << (k%32) )) != 0 ) ;     
+   }
+
+
+void  ClearBit( int A[],  int k )                
+   {
+      A[k/32] &= ~(1 << (k%32));
+   }*/
+
+
+
+void BRW256(__m128i input[][2], __m128i keyptr[2], int blk, int bytes, __m128i result[2], int lg, int step, int loopcnt, int rem, int t)
+{
+
+__m128i res[MAX1][4], tmp[4],  tmp0[2], tmp1[2], tmpnew[4];
+//int i=0, j, k, l=1, 
+int i=0, j, l=1;
+unsigned int isDef = 0, ALLONE=4294967295;
+__m128i g1 = _mm_set_epi32(0x0,0x0,0x0,0x00000425);
+__m128i lenBlk[2];
+
+
+lenBlk[0] = _mm_set_epi32 (0, 0, 0, bytes*8);
+lenBlk[1] = _mm_set_epi32 (0, 0, 0, 0);
+
+tmpnew[0] =  _mm_setzero_si128 ();
+tmpnew[1] = _mm_setzero_si128 ();
+tmpnew[2] =  _mm_setzero_si128 ();
+tmpnew[3] = _mm_setzero_si128 ();
+
+/*printf("at the beginning");
+
+printf("tmp");
+for(i=0;i<4;i++)
+		{
+		printf("\n%x",_mm_extract_epi8 (tmp[i], 0));
+		printf("%x",_mm_extract_epi8 (tmp[i], 1));
+		printf("%x",_mm_extract_epi8 (tmp[i], 2));
+		printf("%x",_mm_extract_epi8 (tmp[i], 3));
+		printf("%x",_mm_extract_epi8 (tmp[i], 4));
+		printf("%x",_mm_extract_epi8 (tmp[i], 5));
+		printf("%x",_mm_extract_epi8 (tmp[i], 6));
+		printf("%x",_mm_extract_epi8 (tmp[i], 7));    		
+		printf("%x",_mm_extract_epi8 (tmp[i], 8));
+		printf("%x",_mm_extract_epi8 (tmp[i], 9));
+		printf("%x",_mm_extract_epi8 (tmp[i], 10));
+		printf("%x",_mm_extract_epi8 (tmp[i], 11));
+		printf("%x",_mm_extract_epi8 (tmp[i], 12));
+		printf("%x",_mm_extract_epi8 (tmp[i], 13));
+		printf("%x",_mm_extract_epi8 (tmp[i], 14));
+		printf("%x",_mm_extract_epi8 (tmp[i], 15));}
+
+
+for(i=0;i<4;i++)
+		{
+		printf("\n%x",_mm_extract_epi8 (tmpnew[i], 0));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 1));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 2));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 3));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 4));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 5));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 6));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 7));    		
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 8));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 9));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 10));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 11));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 12));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 13));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 14));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 15));}
+
+*/
+
+
+//printf("%u", ALLONE);
+//result = &tmpres;
+/*lg = log(blk)/log(2);
+
+t=5;
+step = pow(2,t);
+loopcnt = blk/step;
+rem = blk % step;*/
+
+//printf("rem=%d\n",rem);
+
+
+//key=keyptr;
+ASSIGN(keyPow[0],keyptr);
+
+if(blk > 2)
+for(j=1; j<=lg; j++)
+{
+			
+	mult(keyPow[j-1],keyPow[j-1],keyPow[j]);
+}
+
+
+/*if (blk==0)
+{
+	*result = _mm_setzero_si128 ();
+	return;
+}*/
+/******to be changed later to keyPow******/
+//key = *keyptr;
+//MULTKEYUPTO32;
+
+//printf("loopcount=%d", loopcnt);
+//printf("lg=%d", lg);
+
+
+
+	//printf("%d\n",loopcnt);
+	
+	for(i = 0; i < loopcnt; i++)
+	{
+		
+		//printf("for loop: i=%d\n",i);
+		/*XOR(input[4*i],keyPow[0],tmp0);
+		XOR(input[4*i+1],keyPow[1],tmp1);
+		schoolbook(tmp0,tmp1,res[0]);*/
+		evalbrwseq((input+i*step),res[0]);
+
+		/*printf("out-cc");
+		printf("%x",_mm_extract_epi8 (res[0][0], 0));
+		printf("out-yy");
+		printf("%x",_mm_extract_epi8 (part[0], 0));*/
+		//XOR(input[4*i+2],res[0][0],res[0][0]);
+		j=1;
+		ASSIGNNEW(tmp,res[0]);
+		
+		while(((isDef >> j) & 1)==1)
+		{
+			//printf("\ninside while\n");
+			XORNEW(res[j],tmp,tmp);			
+			j++;
+		}
+		//printf("\ni=%d, j= %d",i,j);
+		XOR(input[step*(i+1)-1],keyPow[j+t-1],tmp0);
+		reductionbymult(tmp,tmp1);
+		karatsuba(tmp0,tmp1,res[j]);
+		isDef |= (1<<j);
+			
+		isDef &= (ALLONE << j);
+
+		//printf("\nisDef=%u",isDef);
+		
+		//i = i+4;
+		
+		//printf("t=%d\n",t);
+		//printf("l=%d\n",l);
+		
+	}
+	if (rem > 0){
+	switch(rem){
+	case 1:
+	
+		/*res[0][0] = input[4*i];
+		res[0][1] = _mm_setzero_si128 ();*/
+		partialone((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 2:
+	
+		/*schoolbook(input[4*i], keyPow[0], res[0]);
+		XOR(input[4*i+1], res[0][0], res[0][0]);*/
+		//printf("case2");
+		//printf("%x",_mm_extract_epi8 (res[0][0], 0));
+		partialtwo((input+blk-rem),tmp);
+		//printf("out2");
+		//printf("%x",_mm_extract_epi8 (res[0][0], 0));
+		//isDef |= 1;
+		break;
+	
+	case 3:
+	
+		/*XOR(input[4*i],keyPow[0],tmp0);
+		XOR(input[4*i+1],keyPow[1],tmp1);
+		schoolbook(tmp0,tmp1,res[0]);
+		XOR(input[4*i+2],res[0][0],res[0][0]);*/
+		partialthree((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;	
+	
+	case 4:
+
+		partialfour((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 5:
+
+		partialfive((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 6:
+
+		partialsix((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 7:
+
+		partialseven((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+	
+
+	case 8:
+
+		partialeight((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 9:
+
+		partialnine((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 10:
+
+		partialten((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 11:
+
+		partialeleven((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 12:
+
+		partialtwelve((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 13:
+
+		partialthirteen((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+	case 14:
+
+		partialfourteen((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+
+
+	case 15:
+
+		partialfifteen((input+blk-rem),tmp);
+		//isDef |= 1;
+		break;
+	case 31:
+
+		evalbrwseq((input+blk-rem),tmp);
+		break;
+	
+	default:
+		
+		
+		/*printf("inside default");
+
+		for(i=0;i<4;i++)
+		{
+		printf("\n%x",_mm_extract_epi8 (tmpnew[i], 0));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 1));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 2));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 3));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 4));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 5));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 6));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 7));    		
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 8));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 9));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 10));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 11));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 12));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 13));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 14));
+		printf("%x",_mm_extract_epi8 (tmpnew[i], 15));}
+		*/
+		partialrest((input+blk-rem), rem, tmp, tmpnew);
+
+	}
+	}
+
+
+else{
+tmp[0] =  _mm_setzero_si128 ();
+tmp[1] = _mm_setzero_si128 ();
+tmp[2] =  _mm_setzero_si128 ();
+tmp[3] = _mm_setzero_si128 ();
+}
+
+/*for(i=0;i<4;i++)
+		{
+		printf("\n%x",_mm_extract_epi8 (tmp[i], 0));
+		printf("%x",_mm_extract_epi8 (tmp[i], 1));
+		printf("%x",_mm_extract_epi8 (tmp[i], 2));
+		printf("%x",_mm_extract_epi8 (tmp[i], 3));
+		printf("%x",_mm_extract_epi8 (tmp[i], 4));
+		printf("%x",_mm_extract_epi8 (tmp[i], 5));
+		printf("%x",_mm_extract_epi8 (tmp[i], 6));
+		printf("%x",_mm_extract_epi8 (tmp[i], 7));    		
+		printf("%x",_mm_extract_epi8 (tmp[i], 8));
+		printf("%x",_mm_extract_epi8 (tmp[i], 9));
+		printf("%x",_mm_extract_epi8 (tmp[i], 10));
+		printf("%x",_mm_extract_epi8 (tmp[i], 11));
+		printf("%x",_mm_extract_epi8 (tmp[i], 12));
+		printf("%x",_mm_extract_epi8 (tmp[i], 13));
+		printf("%x",_mm_extract_epi8 (tmp[i], 14));
+		printf("%x",_mm_extract_epi8 (tmp[i], 15));}
+
+*/
+/*printf("before");
+printf("tmp");
+	printf("%x\n",_mm_extract_epi8 (tmp[0], 0));
+	printf("midVal");
+	printf("%x\n",_mm_extract_epi8 (midVal, 0));*/
+
+//if (blk >= step)
+for(j=1; j <= lg-t+1; j++)
+{
+	if(((isDef >> j) & 1)==1)
+	{
+
+/*		printf("\nj=%d\n",j);
+		for(i=0;i<4;i++)
+		{
+		printf("\n%x",_mm_extract_epi8 (res[j][i], 0));
+		printf("%x",_mm_extract_epi8 (res[j][i], 1));
+		printf("%x",_mm_extract_epi8 (res[j][i], 2));
+		printf("%x",_mm_extract_epi8 (res[j][i], 3));
+		printf("%x",_mm_extract_epi8 (res[j][i], 4));
+		printf("%x",_mm_extract_epi8 (res[j][i], 5));
+		printf("%x",_mm_extract_epi8 (res[j][i], 6));
+		printf("%x",_mm_extract_epi8 (res[j][i], 7));    		
+		printf("%x",_mm_extract_epi8 (res[j][i], 8));
+		printf("%x",_mm_extract_epi8 (res[j][i], 9));
+		printf("%x",_mm_extract_epi8 (res[j][i], 10));
+		printf("%x",_mm_extract_epi8 (res[j][i], 11));
+		printf("%x",_mm_extract_epi8 (res[j][i], 12));
+		printf("%x",_mm_extract_epi8 (res[j][i], 13));
+		printf("%x",_mm_extract_epi8 (res[j][i], 14));
+		printf("%x",_mm_extract_epi8 (res[j][i], 15));
+		}		
+*/
+
+		XORNEW(res[j],tmp,tmp);
+		
+	}
+
+}
+
+/*else 
+{
+	ASSIGNNEW(tmp,res[0]);
+	ASSIGN(midVal, part[0]);
+
+}*/
+
+reductionbymult(tmp,result);
+mult(result,keyPow[0],result);
+XOR(result,lenBlk,result);
+mult(result,keyPow[0],result);
+}
+
+
