@@ -1,0 +1,190 @@
+
+#ifndef MULT_H_
+#define MULT_H_
+
+#define MAX1 15
+
+	#define XOR(var1,var2,var3){\
+		var3 = _mm_xor_si128(var1,var2);}
+
+	#define XORNEW(var1,var2,var3){\
+		var3[0] = _mm_xor_si128(var1[0],var2[0]);\
+		var3[1] = _mm_xor_si128(var1[1],var2[1]);}
+
+	#define ASSIGN(var1,var2){\
+		var1 = var2;}
+	#define ASSIGNNEW(var1,var2){\
+		var1[0] = var2[0];\
+		var1[1] = var2[1];}
+
+
+	
+	
+	__m128i keyPow[MAX1];
+	
+	
+	
+	#define schoolbook(aa,bb,cc,xx)  ({\
+	__m128i r,s;\
+	cc[0] =_mm_clmulepi64_si128( aa, bb, 0x00 );\
+	cc[1] =_mm_clmulepi64_si128( aa, bb, 0x11 );\
+	r = _mm_clmulepi64_si128( aa, bb, 0x01 );\
+	s = _mm_clmulepi64_si128( aa, bb, 0x10 );\
+	xx = _mm_xor_si128(r,s);\
+	/*p = _mm_slli_si128 (r, 8);\
+	s = _mm_srli_si128 (r, 8);\
+	cc[0] = _mm_xor_si128(cc[0],p);\
+	cc[1] = _mm_xor_si128(cc[1],s);*/})
+
+
+	#define reductionbymult(cc,xx,dd)   ({\
+	__m128i r,s,p;\
+	p = _mm_slli_si128 (xx, 8);\
+	s = _mm_srli_si128 (xx, 8);\
+	cc[0] = _mm_xor_si128(cc[0],p);\
+	cc[1] = _mm_xor_si128(cc[1],s);\
+    	r = _mm_clmulepi64_si128( cc[1], POLY, 0x01 );\
+	p = _mm_srli_si128 (r, 8);\
+	p = _mm_xor_si128(p,cc[1]);\
+	s =_mm_clmulepi64_si128( p, POLY, 0x00 );\
+	p = _mm_slli_si128 (r, 8);\
+	dd = _mm_xor_si128(s,p);\
+	dd = _mm_xor_si128(dd,cc[0]);})
+
+	
+
+	#define mult(aa,bb,dd) ({__m128i cc[2],xx;\
+	schoolbook(aa,bb,cc,xx);\
+	reductionbymult(cc,xx,dd);})
+
+
+	
+
+
+void partialone(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+		ASSIGN(*dig,a[0]);
+		dig[1] = _mm_setzero_si128 ();
+		*mid = _mm_setzero_si128 ();
+		
+	}
+
+
+void partialtwo(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		__m128i POLY;
+		
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		schoolbook(a[0],keyPow[0],dig,*mid);
+	        XOR(a[1],dig[0],dig[0]);
+		//printf("in");
+		//printf("%x",_mm_extract_epi8 (dig[0], 0));
+		//reductionbymult(multpart1,xx,*dig);
+
+
+	}
+
+
+
+void partialthree(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		__m128i POLY;
+		__m128i btmp1,btmp2;
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		XOR(a[0],keyPow[0],btmp1);
+		XOR(a[1],keyPow[1],btmp2);
+		schoolbook(btmp1,btmp2,dig,*mid);
+		XOR(a[2],dig[0],dig[0]);
+		//reductionbymult(multpart1,xx,*dig);
+	}
+
+	
+
+void partialfour(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		__m128i POLY;
+		__m128i btmp1,btmp2;
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		XOR(a[0],keyPow[0],btmp1);
+		XOR(a[1],keyPow[1],btmp2);
+		schoolbook(btmp1,btmp2,dig,*mid);
+		XOR(a[2],dig[0],dig[0]);
+		reductionbymult(dig,*mid,btmp1);
+		XOR(a[3],keyPow[2],btmp2);
+		schoolbook(btmp1,btmp2,dig,*mid);
+
+	}
+
+
+
+void partialfive(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		
+		__m128i multpart1[2], POLY;
+		__m128i btmp1,btmp2,btmp25,btmp26,xx;
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		XOR(a[0],keyPow[0],btmp1);
+		XOR(a[1],keyPow[1],btmp2);
+		schoolbook(btmp1,btmp2,multpart1,xx);
+		XOR(a[2],multpart1[0],multpart1[0]);
+		reductionbymult(multpart1,xx,btmp1);
+		XOR(a[3],keyPow[2],btmp2);
+		schoolbook(btmp1,btmp2,dig,*mid);
+		XOR(a[4],dig[0],dig[0]);
+		//reductionbymult(multpart1,xx,*dig);
+
+	}
+
+
+  		
+void partialsix(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		
+		__m128i multpart1[2],multpart2[2],POLY;
+		__m128i btmp1,btmp2,xx,xx1;
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		XOR(a[0],keyPow[0],btmp1);
+		XOR(a[1],keyPow[1],btmp2);
+		schoolbook(btmp1,btmp2,multpart1,xx);
+		XOR(a[2],multpart1[0],multpart1[0]);
+		reductionbymult(multpart1,xx,btmp1);
+		XOR(a[3],keyPow[2],btmp2);
+		schoolbook(btmp1,btmp2,multpart1,xx);
+		schoolbook(a[4],keyPow[0],multpart2,xx1);
+		XOR(a[5],multpart2[0],multpart2[0]);
+		XORNEW(multpart1,multpart2,dig);
+		XOR(xx,xx1,*mid);
+		//reductionbymult(multpart1,xx,*dig);
+	}
+
+
+  		
+
+void partialseven(__m128i a[],__m128i dig[2], __m128i *mid)
+	{
+  		
+		__m128i multpart1[2],multpart2[2],POLY;
+		__m128i btmp1,btmp2,btmp9,btmp10,xx,xx1;
+		POLY = _mm_set_epi32(0x0,0x0,0x0,0x00000087);
+		XOR(a[0],keyPow[0],btmp1);
+		XOR(a[1],keyPow[1],btmp2);
+		schoolbook(btmp1,btmp2,multpart1,xx);
+		XOR(a[2],multpart1[0],multpart1[0]);
+		reductionbymult(multpart1,xx,btmp1);
+		XOR(a[3],keyPow[2],btmp2);
+		XOR(a[4],keyPow[0],btmp9);
+		XOR(a[5],keyPow[1],btmp10);
+		schoolbook(btmp1,btmp2,multpart1,xx);
+		schoolbook(btmp9,btmp10,multpart2,xx1);
+		XOR(a[6],multpart2[0],multpart2[0]);
+		XORNEW(multpart1,multpart2,dig);
+		XOR(xx,xx1,*mid);
+		//reductionbymult(multpart1,xx,*dig);
+
+	}
+
+
+
+
+
+#endif
